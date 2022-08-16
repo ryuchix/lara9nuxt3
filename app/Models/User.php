@@ -2,104 +2,172 @@
 
 namespace App\Models;
 
-use acidjazz\Humble\Models\Session;
-use acidjazz\Humble\Traits\Humble;
-use Database\Factories\UserFactory;
-use Eloquent;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
+use App\Notifications\ResetPassword;
+use App\Notifications\VerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\DatabaseNotification;
-use Illuminate\Notifications\DatabaseNotificationCollection;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Carbon;
+use Tymon\JWTAuth\Contracts\JWTSubject;
+use App\Models\Property;
+use App\Models\AlertUser;
+use App\Models\OAuthProvider;
+use Auth;
+use Hash;
 
-/**
- * App\Models\User
- *
- * @property int $id
- * @property string $email
- * @property string|null $name
- * @property string|null $avatar
- * @property string|null $stripe
- * @property bool $is_sub
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
- * @property-read string $first_name
- * @property-read bool $has_active_session
- * @property-read string $initials
- * @property-read bool $is_trial
- * @property-read array $location
- * @property-read Session $session
- * @property-read DatabaseNotificationCollection|DatabaseNotification[] $notifications
- * @property-read int|null $notifications_count
- * @property-read Collection|Provider[] $providers
- * @property-read int|null $providers_count
- * @property-read Collection|Session[] $sessions
- * @property-read int|null $sessions_count
- *
- * @method static UserFactory factory(...$parameters)
- * @method static Builder|User newModelQuery()
- * @method static Builder|User newQuery()
- * @method static Builder|User query()
- * @method static Builder|User whereAvatar($value)
- * @method static Builder|User whereCreatedAt($value)
- * @method static Builder|User whereEmail($value)
- * @method static Builder|User whereId($value)
- * @method static Builder|User whereIsSub($value)
- * @method static Builder|User whereName($value)
- * @method static Builder|User whereStripe($value)
- * @method static Builder|User whereUpdatedAt($value)
- * @mixin Eloquent
- */
-class User extends Authenticatable
+class User extends Authenticatable implements JWTSubject //, MustVerifyEmail
 {
-    use HasFactory;
-    use Humble;
-    use Notifiable;
+    use Notifiable,
+        HasFactory;
 
     /**
      * The attributes that are mass assignable.
      *
-     * @var array<string>|bool
+     * @var array
      */
-    protected $guarded = [];
-
-    protected $appends = ['first_name', 'is_trial'];
-
-    protected $casts = ['is_sub' => 'boolean'];
-
-    public array $interfaces = [
-        'location' => [
-            'name' => 'api.SessionLocation',
-        ],
-        'session' => [
-            'name' => 'api.Session',
-        ],
-        'sessions' => [
-            'name' => 'api.Sessions',
-        ],
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'phone',
+        'image',
+        'firstname',
+        'lastname',
+        'newsletter',
+        'provider',
+        'provider_id',
+        'role'
     ];
 
-    public function getIsTrialAttribute(): bool
-    {
-        return Carbon::now()->diffInDays($this->created_at) < 8;
-    }
+    /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
-    public function getFirstNameAttribute(): string
+    /**
+     * The attributes that should be cast to native types.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+    ];
+
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = [
+        'photo_url',
+    ];
+
+    /**
+     * Get the profile photo URL attribute.
+     *
+     * @return string
+     */
+    public function getPhotoUrlAttribute()
     {
-        return explode(' ', $this->name ?? '')[0];
+        return vsprintf('https://www.gravatar.com/avatar/%s.jpg?s=200&d=%s', [
+            md5(strtolower($this->email)),
+            $this->name ? urlencode("https://ui-avatars.com/api/$this->name") : 'mp',
+        ]);
     }
 
     /**
-     * Get the providers for the user model.
+     * Get the firstname attribute.
      *
-     * @return HasMany<Provider>
+     * @return string
      */
-    public function providers(): HasMany
+    public function getFirstnameAttribute()
     {
-        return $this->hasMany(Provider::class);
+        $name =  explode(" ", $this->name);
+
+        return $name[0] ?? '';
     }
+
+    /**
+     * Get the lastname attribute.
+     *
+     * @return string
+     */
+    public function getLastnameAttribute()
+    {
+        $name =  explode(" ", $this->name);
+
+        return $name[1] ?? '';
+    }
+
+    /**
+     * Get the oauth providers.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function oauthProviders()
+    {
+        return $this->hasMany(OAuthProvider::class);
+    }
+
+    /**
+     * Send the password reset notification.
+     *
+     * @param  string  $token
+     * @return void
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        $this->notify(new ResetPassword($token));
+    }
+
+    /**
+     * Send the email verification notification.
+     *
+     * @return void
+     */
+    public function sendEmailVerificationNotification()
+    {
+        $this->notify(new VerifyEmail);
+    }
+
+    /**
+     * @return int
+     */
+    public function getJWTIdentifier()
+    {
+        return $this->getKey();
+    }
+
+    /**
+     * @return array
+     */
+    public function getJWTCustomClaims()
+    {
+        return [];
+    }
+
+    public function favorites()
+    {
+        return $this->belongsToMany(Property::class, 'favorites', 'user_id', 'property_id')->withTimeStamps();
+    }
+
+    public function getProviderAttribute()
+    {
+        return OAuthProvider::where('user_id', Auth::user()->id)->first();
+    }
+
+    public function setPasswordAttribute($password){
+        $this->attributes['password'] = Hash::make($password);
+    }
+
+    public function getImageAttribute($value)
+    {
+        return $value !== null ? asset('uploads/'.$value) : null;
+    }
+
 }

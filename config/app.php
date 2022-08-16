@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laranuxt'),
+    'name' => env('APP_NAME', 'Laravel'),
 
     /*
     |--------------------------------------------------------------------------
@@ -53,10 +53,10 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
-    'web' => env('WEB_URL', 'http://localhost:3000'),
-    'api' => env('API_URL', 'http://localhost:8000'),
 
     'asset_url' => env('ASSET_URL', null),
+
+    'client_url' => env('CLIENT_URL', 'http://192.168.1.46:3000'),
 
     /*
     |--------------------------------------------------------------------------
@@ -83,6 +83,12 @@ return [
     */
 
     'locale' => 'en',
+
+    'locales' => [
+        'en' => 'EN',
+        'es' => 'ES',
+        'zh-CN' => '中文',
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -163,6 +169,7 @@ return [
         Illuminate\Translation\TranslationServiceProvider::class,
         Illuminate\Validation\ValidationServiceProvider::class,
         Illuminate\View\ViewServiceProvider::class,
+        Laravel\Socialite\SocialiteServiceProvider::class,
 
         /*
          * Package Service Providers...
@@ -173,7 +180,7 @@ return [
          */
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
-        App\Providers\BroadcastServiceProvider::class,
+        // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
 
@@ -228,7 +235,7 @@ return [
         'URL' => Illuminate\Support\Facades\URL::class,
         'Validator' => Illuminate\Support\Facades\Validator::class,
         'View' => Illuminate\Support\Facades\View::class,
-
+        'Socialite' => Laravel\Socialite\Facades\Socialite::class,
     ],
 
 ];

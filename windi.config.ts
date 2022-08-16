@@ -9,4 +9,5 @@ export default defineConfig({
       "node_modules/tailvue/dist/tailvue.umd.js",
     ],
   },
+  'server.hmr.overlay': false,
 })

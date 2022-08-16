@@ -1,0 +1,7 @@
+.git
+.nuxt
+vendor
+node_modules
+
+# workflow
+.github
